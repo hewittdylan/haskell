@@ -8,6 +8,18 @@
         - Corrección: Guardaremos para cada corrección el nombre/DNI del alumno, y su nota final, tanto la total como sobre 10
         - Estadísticas: Para el total de los alumnos vamos a calcular la siguiente información:
             * Puntuación media, número medio de preguntas respondidas, número de suspensos, aprobados, notables y sobresalientes
+
+    Definimos después las 2 funciones principales del programa, junto con una auxiliar:
+        - corrige: Dado un test y unas respuestas al propio test devuelve la corrección de las respuestas con su respectiva calificación
+        - calculaPuntuacion: Dada una pregunta y una respuesta sueltas, devuelve los puntos que suma o resta 
+        - estadisticas: Dado un test y un conjunto de respuestas al test devuelve una serie de estadísticas sobre los mismos
+
+    Por último vamos a definir una función que permita la E/S de datos al usuario, el formato de ejemplo de los mismos debe ser:
+        - preguntas del test: [(1.0,3,1),(0.5,4,4),(1.0,3,2),(0.5,2,2)]
+        - modelos del test: [[2,1,0,3],[0,2,3,1],[3,2,1,0]]
+        - las respuestas de los alumnos: [("Juan",3,[2,0,3,1]),("Maria",1,[3,4,1,2])]
+            - En lugar de nombres podemos emplear los dnis, o cualquier otro String que distinga a los alumnos
+
 -}
 
 type Pregunta = (Float, Int, Int)
@@ -45,13 +57,53 @@ estadisticas test respuestas =
         sobresalientes = length $ filter (>= 9) notas
     in (mediaNota, mediaPreguntasRespondidas, suspensos, aprobados, notables, sobresalientes)
 
--- Main de ejemplo
+-- Programada con ayuda de chatGPT, para conseguir emplear getLine junto con la función read
+--{-
 main :: IO ()
 main = do
-    let test = ([ (1.0, 3, 1), (0.5, 4, 4), (1.0, 3, 2), (0.5, 2, 2) ], -- Preguntas
-                 [[2,1,0,3], [0,2,3,1], [3,2,1,0]])                     -- Modelos
+    putStrLn "Introduce las preguntas del test (como lista de tuplas):"
+    preguntasInput <- getLine
+    let testPreguntas = read preguntasInput :: [Pregunta]
+
+    putStrLn "Introduce los modelos del test (como lista de listas):"
+    modelosInput <- getLine
+    let testModelos = read modelosInput :: [[Int]]
+
+    putStrLn "Introduce las respuestas de los alumnos (como lista de tuplas):"
+    respuestasInput <- getLine
+    let respuestas = read respuestasInput :: [RespuestaTest]
+
+    let test = (testPreguntas, testModelos)
+
+    putStrLn "\nCorrigiendo respuestas..."
+    let correcciones = map (corrige test) respuestas
+    mapM_ print correcciones 
+
+    putStrLn "\nCalculando estadísticas..."
+    let (mediaNota, mediaPreguntasRespondidas, suspensos, aprobados, notables, sobresalientes) = estadisticas test respuestas
+    putStrLn $ "1. Nota media de los alumnos: " ++ show mediaNota
+    putStrLn $ "2. Número medio de preguntas respondidas: " ++ show mediaPreguntasRespondidas
+    putStrLn $ "3. Número de suspensos: " ++ show suspensos
+    putStrLn $ "4. Número de aprobados: " ++ show aprobados
+    putStrLn $ "5. Número de notables: " ++ show notables
+    putStrLn $ "6. Número de sobresalientes: " ++ show sobresalientes
+--}
+
+-- Main de ejemplo, para ahorrarse reescribir la entrada
+{-
+main :: IO ()
+main = do
+    let test = ([ (1.0, 3, 1), (0.5, 4, 4), (1.0, 3, 2), (0.5, 2, 2) ], -- Test
+                [[2,1,0,3], [0,2,3,1], [3,2,1,0]])  -- Modelos
     let respuestas = [("Juan", 3, [2, 0, 3, 1]), ("Maria", 1, [3, 4, 1, 2])]
     putStrLn "Corrigiendo respuestas..."
     mapM_ print (map (corrige test) respuestas)
     putStrLn "Calculando estadísticas..."
-    print (estadisticas test respuestas)
+    let (mediaNota, mediaPreguntasRespondidas, suspensos, aprobados, notables, sobresalientes) = estadisticas test respuestas
+    putStrLn $ "1. Nota media de los alumnos: " ++ show mediaNota
+    putStrLn $ "2. Número medio de preguntas respondidas: " ++ show mediaPreguntasRespondidas
+    putStrLn $ "3. Número de suspensos: " ++ show suspensos
+    putStrLn $ "4. Número de aprobados: " ++ show aprobados
+    putStrLn $ "5. Número de notables: " ++ show notables
+    putStrLn $ "6. Número de sobresalientes: " ++ show sobresalientes
+-}
