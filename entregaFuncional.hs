@@ -6,8 +6,10 @@
         - Test: Guardamos una lista con las preguntas del test, así como una lista por cada modelo con una lista de índices para cada uno
         - RespuestaTest: Guardamos para cada respuesta el nombre (o DNI (String)), el índice del modelo y la respuesta que ha marcado en cada pregunta (0 si la deja en blanco)
         - Corrección: Guardaremos para cada corrección el nombre/DNI del alumno, y su nota final, tanto la total como sobre 10
+        - Frecuencias: Guardamos para cada pregunta cuantas veces se ha acertado, fallado o dejado en blanco de forma absoluta y relativa
         - Estadísticas: Para el total de los alumnos vamos a calcular la siguiente información:
-            * Puntuación media, número medio de preguntas respondidas, número de suspensos, aprobados, notables y sobresalientes
+            * Puntuación media, número medio de preguntas respondidas, número de suspensos, aprobados, notables y sobresalientes,
+              frecuencias por cada pregunta, pregunta más acertada, pregunta menos acertada, pregunta más dejada en blanco y menos dejada en blanco
 
     Definimos después las 2 funciones principales del programa, junto con una auxiliar:
         - corrige: Dado un test y unas respuestas al propio test devuelve la corrección de las respuestas con su respectiva calificación
@@ -21,21 +23,25 @@
             - En lugar de nombres podemos emplear los dnis, o cualquier otro String que distinga a los alumnos
 
 -}
+import Data.List (maximumBy, minimumBy)
+import Data.Function (on)
 
 type Pregunta = (Float, Int, Int)
 type Test = ([Pregunta], [[Int]])
 type RespuestaTest = (String, Int, [Int])
-type Correccion = (String, Float, Float) 
-type Estadisticas = (Float, Float, Int, Int, Int, Int) 
+type Correccion = (String, Float, Float)
+type Frecuencias = [(Int, Int, Int, Float, Float, Float)]
+type Estadisticas = (Float, Float, Int, Int, Int, Int, Frecuencias, Int, Int, Int, Int)
 
 corrige :: Test -> RespuestaTest -> Correccion   -- Dado un Test corrige las respuestas de RespuestaTest devolviendo una Corrección
 corrige (preguntas, modelos) (nombre, modelo, respuestas) =
     let ordenPreguntas = modelos !! (modelo - 1) -- Sacamos el orden de las preguntas para el modelo del alumno
         preguntasOrdenadas = map (preguntas !!) ordenPreguntas -- Ordenamos las preguntas del test para que concuerden con las del alumno
-        puntuacionTotal = sum (zipWith (calculaPuntuacion) preguntasOrdenadas respuestas) -- Usamos calculaPuntuación para calcular cuánto suma/resta cada pregunta
+        puntuacionTotal = sum (zipWith calculaPuntuacion preguntasOrdenadas respuestas) -- Usamos calculaPuntuación para calcular cuánto suma/resta cada pregunta
         puntuacionSobre10 = (puntuacionTotal / sum (map (\(valor, _, _) -> valor) preguntas)) * 10  -- Dividimos la puntuación total obtenida entre el valor máximo obtenible
     in (nombre, puntuacionTotal, puntuacionSobre10)
 
+-- Calcula cuanto suma cada pregunta corrigiéndola
 calculaPuntuacion :: (Float, Int, Int) -> Int -> Float
 calculaPuntuacion (valor, nAlternativas, correcta) respuesta
     | respuesta == 0       = 0       -- Respuesta en blanco
@@ -46,7 +52,8 @@ estadisticas :: Test -> [RespuestaTest] -> Estadisticas
 estadisticas test respuestas =
     let correcciones = map (corrige test) respuestas  -- Vamos primero a corregir las respuestas con la función previamente definida
         notas = map (\(_, _, nota) -> nota) correcciones  -- Obtenemos la nota sobre 10 para cada una de ellas (no nos interesa el nombre)
-        --totalPreguntas = length (fst test)  -- Obtenemos el número total de preguntas
+
+        -- Métricas generales
         mediaNota = sum notas / fromIntegral (length notas)  -- Calculamos la nota media
         preguntasRespondidas = map (\(_, _, reps) -> length ( filter (/= 0) reps)) respuestas -- Contamos cuantas preguntas se han contestado (distinto de 0) en total
         mediaPreguntasRespondidas = sum (map fromIntegral preguntasRespondidas) / fromIntegral (length preguntasRespondidas) -- Calculamos la media de preguntas respondidas
@@ -55,9 +62,64 @@ estadisticas test respuestas =
         aprobados = length $ filter (\x -> x >= 5 && x < 7) notas
         notables = length $ filter (\x -> x >= 7 && x < 9) notas
         sobresalientes = length $ filter (>= 9) notas
-    in (mediaNota, mediaPreguntasRespondidas, suspensos, aprobados, notables, sobresalientes)
 
--- Programada con ayuda de chatGPT, para conseguir emplear getLine junto con la función read
+        -- Frecuencias por pregunta
+        preguntas = fst test
+        modelos = snd test
+        respuestasOrdenadas = map (reordenarRespuestas modelos) respuestas
+        respuestasPorPregunta = traspuesta (map (\(_, _, rs) -> rs) respuestas)  --traspuesta implementada debajo
+        frecuencias = zipWith calcularFrecuencias respuestasPorPregunta preguntas
+
+        -- Mejores, peores y preguntas en blanco
+        (mejorPregunta, peorPregunta) = mejoresPeores frecuencias
+        (masBlanco, menosBlanco) = masMenosBlancos frecuencias
+    in (mediaNota, mediaPreguntasRespondidas, suspensos, aprobados, notables, sobresalientes, frecuencias, mejorPregunta, peorPregunta, masBlanco, menosBlanco)
+
+-- Función para reordenar respuestas según el modelo
+reordenarRespuestas :: [[Int]] -> RespuestaTest -> RespuestaTest
+reordenarRespuestas modelos (nombre, modelo, respuestas) =
+    let orden = modelos !! (modelo - 1)
+        respuestasReordenadas = map (respuestas !!) orden
+    in (nombre, modelo, respuestasReordenadas)
+
+-- Calcula la traspuesta de una matriz
+-- Ejemplo: [[1, 2, 3], [4, 5, 6], [7, 8, 9]] ---> [[1, 4, 7], [2, 5, 8], [3, 6, 9]]
+traspuesta :: [[a]] -> [[a]]
+traspuesta [] = []
+traspuesta ([]:_) = [] -- Caso base: cuando alguna sublista está vacía
+traspuesta xss = map head xss : traspuesta (map tail xss)
+
+-- Cálculo de frecuencias para cada pregunta
+calcularFrecuencias :: [Int] -> (Float, Int, Int) -> (Int, Int, Int, Float, Float, Float)
+calcularFrecuencias respuestas (_, alternativas, correcta) =
+    let totalRespuestas = length respuestas
+        correctas = length $ filter (== correcta) respuestas
+        erroneas = length $ filter (\x -> x /= correcta && x /= 0) respuestas
+        enBlanco = length $ filter (== 0) respuestas
+        correctasRel = fromIntegral correctas / fromIntegral totalRespuestas
+        erroneasRel = fromIntegral erroneas / fromIntegral totalRespuestas
+        enBlancoRel = fromIntegral enBlanco / fromIntegral totalRespuestas
+    in (correctas, erroneas, enBlanco, correctasRel, erroneasRel, enBlancoRel)
+
+-- Determinar la pregunta con más y con menos aciertos
+-- Usado ChatGPT para programar una función que determine el índice del valor máximo y mínimo
+mejoresPeores :: Frecuencias -> (Int, Int)
+mejoresPeores frecuencias =
+    let resultados = map (\(c, _, _, _, _, _) -> c) frecuencias
+        mejor = fst $ maximumBy (compare `on` snd) (zip [1..] resultados)
+        peor = fst $ minimumBy (compare `on` snd) (zip [1..] resultados)
+    in (mejor, peor)
+
+-- Determinar la pregunta más y menos veces dejada en blanco
+masMenosBlancos :: Frecuencias -> (Int, Int)
+masMenosBlancos frecuencias =
+    let blancos = map (\(_, _, b, _, _, _) -> b) frecuencias
+        masBlanco = fst $ maximumBy (compare `on` snd) (zip [1..] blancos)
+        menosBlanco = fst $ minimumBy (compare `on` snd) (zip [1..] blancos)
+    in (masBlanco, menosBlanco)
+
+
+-- Programada con ayuda de ChatGPT, para conseguir emplear getLine junto con la función read
 --{-
 main :: IO ()
 main = do
@@ -77,16 +139,9 @@ main = do
 
     putStrLn "\nCorrigiendo respuestas..."
     let correcciones = map (corrige test) respuestas
-    mapM_ print correcciones 
+    mapM_ print correcciones
 
-    putStrLn "\nCalculando estadísticas..."
-    let (mediaNota, mediaPreguntasRespondidas, suspensos, aprobados, notables, sobresalientes) = estadisticas test respuestas
-    putStrLn $ "1. Nota media de los alumnos: " ++ show mediaNota
-    putStrLn $ "2. Número medio de preguntas respondidas: " ++ show mediaPreguntasRespondidas
-    putStrLn $ "3. Número de suspensos: " ++ show suspensos
-    putStrLn $ "4. Número de aprobados: " ++ show aprobados
-    putStrLn $ "5. Número de notables: " ++ show notables
-    putStrLn $ "6. Número de sobresalientes: " ++ show sobresalientes
+    printEstadisticas (estadisticas test respuestas)
 --}
 
 -- Main de ejemplo, para ahorrarse reescribir la entrada
@@ -97,13 +152,30 @@ main = do
                 [[2,1,0,3], [0,2,3,1], [3,2,1,0]])  -- Modelos
     let respuestas = [("Juan", 3, [2, 0, 3, 1]), ("Maria", 1, [3, 4, 1, 2])]
     putStrLn "Corrigiendo respuestas..."
-    mapM_ print (map (corrige test) respuestas)
-    putStrLn "Calculando estadísticas..."
-    let (mediaNota, mediaPreguntasRespondidas, suspensos, aprobados, notables, sobresalientes) = estadisticas test respuestas
+    let correcciones = map (corrige test) respuestas
+    mapM_ print correcciones
+    
+    printEstadisticas (estadisticas test respuestas)
+-}
+
+printEstadisticas :: Estadisticas -> IO ()
+printEstadisticas (mediaNota, mediaPreguntasRespondidas, suspensos, aprobados, notables, sobresalientes, frecuencias, mejorPregunta, peorPregunta, masBlanco, menosBlanco) = do
+    putStrLn "\nEstadísticas del test:"
     putStrLn $ "1. Nota media de los alumnos: " ++ show mediaNota
     putStrLn $ "2. Número medio de preguntas respondidas: " ++ show mediaPreguntasRespondidas
     putStrLn $ "3. Número de suspensos: " ++ show suspensos
     putStrLn $ "4. Número de aprobados: " ++ show aprobados
     putStrLn $ "5. Número de notables: " ++ show notables
     putStrLn $ "6. Número de sobresalientes: " ++ show sobresalientes
--}
+    putStrLn "7. Frecuencias (Correctas, Erróneas, En blanco), (Relativas correctas, Relativas erróneas, Relativas en blanco):"
+    mapM_ printFrecuencia (zip [1..] frecuencias)
+    putStrLn $ "8. Pregunta con mejores resultados: " ++ show mejorPregunta
+    putStrLn $ "9. Pregunta con peores resultados: " ++ show peorPregunta
+    putStrLn $ "10. Pregunta más veces dejada en blanco: " ++ show masBlanco
+    putStrLn $ "11. Pregunta menos veces dejada en blanco: " ++ show menosBlanco
+
+printFrecuencia :: (Int, (Int, Int, Int, Float, Float, Float)) -> IO ()
+printFrecuencia (n, (c, e, b, cr, er, br)) =
+    putStrLn $ "   Pregunta " ++ show n ++ 
+        ": (" ++ show c ++ ", " ++ show e ++ ", " ++ show b ++ 
+        ") , (" ++ show cr ++ ", " ++ show er ++ ", " ++ show br ++ ")"
