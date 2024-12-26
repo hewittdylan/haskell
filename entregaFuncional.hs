@@ -9,20 +9,29 @@
         - Frecuencias: Guardamos para cada pregunta cuantas veces se ha acertado, fallado o dejado en blanco de forma absoluta y relativa
         - Estadísticas: Para el total de los alumnos vamos a calcular la siguiente información:
             * Puntuación media, número medio de preguntas respondidas, número de suspensos, aprobados, notables y sobresalientes,
-              frecuencias por cada pregunta, pregunta más acertada, pregunta menos acertada, pregunta más dejada en blanco y menos dejada en blanco
+              frecuencias por cada pregunta, pregunta más acertada, pregunta menos acertada, pregunta más dejada en blanco y menos dejada en blanco,
+              preguntas con mejor y peor resultados, y preguntas más y menos veces dejada en blanco
 
-    Definimos después las 2 funciones principales del programa, junto con una auxiliar:
+    Definimos después las 2 funciones principales del programa, junto con funciones auxiliares:
         - corrige: Dado un test y unas respuestas al propio test devuelve la corrección de las respuestas con su respectiva calificación
-        - calculaPuntuacion: Dada una pregunta y una respuesta sueltas, devuelve los puntos que suma o resta 
+        - (aux) calculaPuntuacion: Dada una pregunta y una respuesta sueltas, devuelve los puntos que suma o resta 
         - estadisticas: Dado un test y un conjunto de respuestas al test devuelve una serie de estadísticas sobre los mismos
+        - (aux) reordenarRespuestas: reordena las preguntas del alumno según el modelo que le haya tocado
+        - (aux) traspuesta: Hace la traspuesta de una matriz (lista de listas)
+        - (aux) calcularFrecuencias: Para cada pregunta calcula cuantas veces se ha acertado, fallado o dejado en blanco
+        - (aux) mejoresPeores: Devuelve la pregunta más, y la menos acertada
+        - (aux) masMenosBlancos: Devuelve la pregunta más, y menos dejada en blanco
 
-    Por último vamos a definir una función que permita la E/S de datos al usuario, el formato de ejemplo de los mismos debe ser:
+    Por último vamos a definir una función que permita la E/S de datos al usuario (main), el formato de ejemplo de los mismos debe ser:
         - preguntas del test: [(1.0,3,1),(0.5,4,4),(1.0,3,2),(0.5,2,2)]
         - modelos del test: [[2,1,0,3],[0,2,3,1],[3,2,1,0]]
         - las respuestas de los alumnos: [("Juan",3,[2,0,3,1]),("Maria",1,[3,4,1,2])]
             - En lugar de nombres podemos emplear los dnis, o cualquier otro String que distinga a los alumnos
 
+        Vamos a añadir también otras 2 auxiliares de E/S : printEstadisticas y printFrecuencias que impriman los resultados
+
 -}
+
 import Data.List (maximumBy, minimumBy)
 import Data.Function (on)
 
@@ -35,7 +44,8 @@ type Estadisticas = (Float, Float, Int, Int, Int, Int, Frecuencias, Int, Int, In
 
 corrige :: Test -> RespuestaTest -> Correccion   -- Dado un Test corrige las respuestas de RespuestaTest devolviendo una Corrección
 corrige (preguntas, modelos) (nombre, modelo, respuestas) =
-    let ordenPreguntas = modelos !! (modelo - 1) -- Sacamos el orden de las preguntas para el modelo del alumno
+    let 
+        ordenPreguntas = modelos !! (modelo - 1) -- Sacamos el orden de las preguntas para el modelo del alumno
         preguntasOrdenadas = map (preguntas !!) ordenPreguntas -- Ordenamos las preguntas del test para que concuerden con las del alumno
         puntuacionTotal = sum (zipWith calculaPuntuacion preguntasOrdenadas respuestas) -- Usamos calculaPuntuación para calcular cuánto suma/resta cada pregunta
         puntuacionSobre10 = (puntuacionTotal / sum (map (\(valor, _, _) -> valor) preguntas)) * 10  -- Dividimos la puntuación total obtenida entre el valor máximo obtenible
@@ -120,6 +130,7 @@ masMenosBlancos frecuencias =
 
 
 -- Programada con ayuda de ChatGPT, para conseguir emplear getLine junto con la función read
+-- Y aprendido a usar mapM_
 --{-
 main :: IO ()
 main = do
@@ -148,9 +159,13 @@ main = do
 {-
 main :: IO ()
 main = do
-    let test = ([ (1.0, 3, 1), (0.5, 4, 4), (1.0, 3, 2), (0.5, 2, 2) ], -- Test
-                [[2,1,0,3], [0,2,3,1], [3,2,1,0]])  -- Modelos
-    let respuestas = [("Juan", 3, [2, 0, 3, 1]), ("Maria", 1, [3, 4, 1, 2])]
+    let test = ([(1.0, 4, 3), (1.0, 3, 1), (0.5, 5, 4), (2.0, 4, 2), (1.5, 3, 2),
+            (1.0, 4, 1), (0.5, 2, 2), (1.0, 3, 3), (1.0, 4, 4), (2.0, 5, 1)], -- Test
+            [[1,0,2,3,4,5,6,7,8,9], [3,1,0,4,5,9,7,6,8,2], [5,9,4,6,8,7,0,1,2,3]])  -- Modelos
+    let respuestas = [("Alumno1", 1, [3,1,4,2,2,1,2,3,4,1]),
+                      ("Alumno2", 2, [2,0,1,3,3,1,2,3,4,1]),
+                      ("Alumno3", 1, [1,1,3,1,2,3,2,2,3,1]),
+                      ("Alumno4", 3, [2,3,4,1,4,3,2,1,2,1])]
     putStrLn "Corrigiendo respuestas..."
     let correcciones = map (corrige test) respuestas
     mapM_ print correcciones
