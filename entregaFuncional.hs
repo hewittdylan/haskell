@@ -1,6 +1,22 @@
 {-
-    Entrega Programación Funcional - Dylan Hewitt Martínez
+    Entrega Programación Funcional - Dylan Hewitt
 
+    Funcionamiento: 
+    - Al ejecutar la aplicación nos pedirá introducir las preguntas del test como lista de tuplas, con el siguiente formato:
+        [(Float, Int, Int)] 
+        Siendo Float la puntuación de la pregunta, el número de respuestas poisbles, y el número de la correcta
+        Ejemplo: [(1.0,3,1),(0.5,4,4),(1.0,3,2),(0.5,2,2)]
+    - A continuación nos pedirá introducir los modelos del test (reordenaciones de las preguntas) como lista de listas:
+        [[Int]]
+        Aquí cada lista de enteros es una reordenación de las preguntas
+        Ejemplo: [[2,1,0,3],[0,2,3,1],[3,2,1,0]]
+    - Por último nos pedirá introducir respuestas de los alumnos, como lista de tuplas de la siguiente manera:
+        [(String, Int, [Int])]
+        Aquí String será el identificativo del alumno DNI/Nombre, Int el modelo que le ha tocado (1..n) y por último las respuestas que ha escogido para su modelo
+        Ejemplo: [("Juan",3,[2,0,3,1]),("Maria",1,[3,4,1,2])]
+        !!! Importante recalcar que si el alumno deja una respuesta en blanco esta se señala con un 0, y las respuestas van de 0 a n siendo n el número de alternativas de la pregunta
+
+    Implementación:
     Primero tenemos que definir los tipos que vamos a emplear:
         - Pregunta: Guardaremos el valor de la pregunta, así como el número de opciones y la opción que sea correcta
         - Test: Guardamos una lista con las preguntas del test, así como una lista por cada modelo con una lista de índices para cada uno
@@ -134,15 +150,15 @@ masMenosBlancos frecuencias =
 --{-
 main :: IO ()
 main = do
-    putStrLn "Introduce las preguntas del test (como lista de tuplas):"
+    putStrLn "Introduce las preguntas del test ([(Float, Int, Int)]):"
     preguntasInput <- getLine
     let testPreguntas = read preguntasInput :: [Pregunta]
 
-    putStrLn "Introduce los modelos del test (como lista de listas):"
+    putStrLn "Introduce los modelos del test ([[Int]]):"
     modelosInput <- getLine
     let testModelos = read modelosInput :: [[Int]]
 
-    putStrLn "Introduce las respuestas de los alumnos (como lista de tuplas):"
+    putStrLn "Introduce las respuestas de los alumnos ([String, Int, [Int]]):"
     respuestasInput <- getLine
     let respuestas = read respuestasInput :: [RespuestaTest]
 
